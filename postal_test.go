@@ -41,6 +41,14 @@ func findDataDir() string {
 	return ""
 }
 
+var _ = Describe("New", func() {
+	It("returns an error for an invalid data directory", func() {
+		_, err := postal.New(postal.WithDataDir("/nonexistent/path"))
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("/nonexistent/path"))
+	})
+})
+
 var _ = Describe("Expand", Ordered, func() {
 	var p *postal.Postal
 
