@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.26-alpine
+
+    steps:
+      - name: Install dependencies
+        run: apk add --no-cache build-base libpostal-dev pkgconf git
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run linting
+        run: make lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.26-alpine
+
+    steps:
+      - name: Install dependencies
+        run: apk add --no-cache build-base libpostal-dev libpostal-data pkgconf git
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: make test

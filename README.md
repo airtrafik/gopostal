@@ -1,94 +1,117 @@
-# gopostal
+# postal
 
-[![Build Status](https://travis-ci.org/openvenues/gopostal.svg?branch=master)](https://travis-ci.org/openvenues/gopostal)
+[![CI](https://github.com/airtrafik/postal/actions/workflows/ci.yaml/badge.svg)](https://github.com/airtrafik/postal/actions/workflows/ci.yaml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/airtrafik/postal.svg)](https://pkg.go.dev/github.com/airtrafik/postal)
 
 Go/cgo interface to [libpostal](https://github.com/openvenues/libpostal), a C library for fast international street address parsing and normalization.
 
-## Usage
+Originally forked from [openvenues/gopostal](https://github.com/openvenues/gopostal), rewritten with a modern Go API:
 
-To expand address strings into normalized forms suitable for geocoder queries:
+- Single `postal.New()` constructor with functional options
+- Configurable data directory via `WithDataDir()` or `LIBPOSTAL_DATA_DIR` environment variable
+- Proper error returns instead of `log.Fatal`
+- No `init()` side effects
+- Go module support
+
+## Usage
 
 ```go
 package main
 
 import (
     "fmt"
-    expand "github.com/openvenues/gopostal/expand"
+    "log"
+
+    "github.com/airtrafik/postal"
 )
 
 func main() {
-    expansions := expand.ExpandAddress("Quatre-vingt-douze Ave des Ave des Champs-Élysées")
+    p, err := postal.New()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer p.Close()
 
-    for i := 0; i < len(expansions); i++ {
-        fmt.Println(expansions[i])
+    // Expand an address into normalized forms
+    expansions := p.Expand("Quatre-vingt-douze Ave des Champs-Élysées")
+    for _, e := range expansions {
+        fmt.Println(e)
+    }
+
+    // Parse an address into labeled components
+    components := p.Parse("781 Franklin Ave Crown Heights Brooklyn NY 11216 USA")
+    for _, c := range components {
+        fmt.Printf("%s: %s\n", c.Label, c.Value)
     }
 }
 ```
 
-To parse addresses into components:
+### Custom data directory
+
+Point libpostal at a non-default data directory (e.g., a GCS FUSE mount):
 
 ```go
-package main
+p, err := postal.New(postal.WithDataDir("/mnt/gcs/libpostal-data"))
+```
 
-import (
-    "fmt"
-    parser "github.com/openvenues/gopostal/parser"
-)
+Or set the `LIBPOSTAL_DATA_DIR` environment variable:
 
-func main() {
-    parsed := parser.ParseAddress("781 Franklin Ave Crown Heights Brooklyn NY 11216 USA")
-    fmt.Println(parsed)
-}
+```bash
+export LIBPOSTAL_DATA_DIR=/mnt/gcs/libpostal-data
 ```
 
 ## Prerequisites
 
-Before using the Go bindings, you must install the libpostal C library. Make sure you have the following prerequisites:
+Install the libpostal C library before using postal.
+
+**On Mac**
+```bash
+brew install curl autoconf automake libtool pkg-config
+```
 
 **On Ubuntu/Debian**
-```
+```bash
 sudo apt-get install curl autoconf automake libtool pkg-config
 ```
 
-**On CentOS/RHEL**
-```
-sudo yum install curl autoconf automake libtool pkgconfig
-```
-
-**On Mac OSX**
-```
-sudo brew install curl autoconf automake libtool pkg-config
+**On Alpine**
+```bash
+apk add libpostal-dev libpostal-data
 ```
 
-**Installing libpostal**
+**Installing libpostal from source**
 
-```
+```bash
 git clone https://github.com/openvenues/libpostal
 cd libpostal
 ./bootstrap.sh
 ./configure --datadir=[...some dir with a few GB of space...]
-make
+make -j4
 sudo make install
-
-# On Linux it's probably a good idea to run
-sudo ldconfig
+sudo ldconfig  # Linux only
 ```
 
 ## Installation
 
-For expansions:
-
-```
-go get github.com/openvenues/gopostal/expand
+```bash
+go get github.com/airtrafik/postal
 ```
 
-For parsing:
-```
-go get github.com/openvenues/gopostal/parser
+## Development
+
+```bash
+make          # Full build: clean, lint, test
+make test     # Run tests only
+make lint     # Run linters only
+make lint-fix # Auto-fix formatting
+make help     # Show all targets
 ```
 
-## Tests
+## Releasing
 
-```
-go test github.com/openvenues/gopostal/...
+Releases use [svu](https://github.com/caarlos0/svu) for semantic versioning based on conventional commits:
+
+```bash
+make release-preview  # Show what the next version would be
+make release          # Interactive release with confirmation
 ```
