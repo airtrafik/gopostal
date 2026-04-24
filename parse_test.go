@@ -9,7 +9,19 @@ import (
 	"github.com/airtrafik/postal"
 )
 
-var _ = Describe("Parse", func() {
+var _ = Describe("Parse", Ordered, func() {
+	var p *postal.Postal
+
+	BeforeAll(func() {
+		var err error
+		p, err = postal.New()
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterAll(func() {
+		p.Close()
+	})
+
 	It("parses a US address into components", func() {
 		components := p.Parse("781 Franklin Ave Crown Heights Brooklyn NYC NY 11216 USA")
 
@@ -35,10 +47,23 @@ var _ = Describe("Parse", func() {
 		))
 	})
 
-	It("parses with language and country options", func() {
+	It("returns nil for invalid UTF-8 input", func() {
+		components := p.Parse("\xff\xfe")
+		Expect(components).To(BeNil())
+	})
+
+	It("parses with language option", func() {
 		components := p.ParseWithOptions("781 Franklin Ave Brooklyn NY 11216", postal.ParseOptions{
 			Language: "en",
-			Country:  "us",
+		})
+		Expect(components).NotTo(BeEmpty())
+		Expect(components[0].Label).To(Equal("house_number"))
+		Expect(components[0].Value).To(Equal("781"))
+	})
+
+	It("parses with country option", func() {
+		components := p.ParseWithOptions("781 Franklin Ave Brooklyn NY 11216", postal.ParseOptions{
+			Country: "us",
 		})
 		Expect(components).NotTo(BeEmpty())
 		Expect(components[0].Label).To(Equal("house_number"))

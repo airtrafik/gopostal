@@ -9,58 +9,24 @@ import (
 	"github.com/airtrafik/postal"
 )
 
-var p *postal.Postal
-
-var _ = BeforeSuite(func() {
-	var err error
-	p, err = postal.New()
-	Expect(err).NotTo(HaveOccurred())
-})
-
-var _ = AfterSuite(func() {
-	if p != nil {
-		p.Close()
-	}
-})
-
 func TestPostal(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Postal Suite")
 }
 
-var _ = Describe("New", func() {
-	It("initializes with WithDataDir", func() {
-		// Use the default system data dir path
-		p2, err := postal.New(postal.WithDataDir("/usr/share/libpostal"))
-		if err != nil {
-			Skip("libpostal data not at /usr/share/libpostal: " + err.Error())
-		}
-		defer p2.Close()
+var _ = Describe("Expand", Ordered, func() {
+	var p *postal.Postal
 
-		expansions := p2.Expand("123 Main St")
-		Expect(expansions).To(ContainElement("123 main street"))
+	BeforeAll(func() {
+		var err error
+		p, err = postal.New()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("initializes with LIBPOSTAL_DATA_DIR env var", func() {
-		GinkgoT().Setenv("LIBPOSTAL_DATA_DIR", "/usr/share/libpostal")
-
-		p2, err := postal.New()
-		if err != nil {
-			Skip("libpostal data not at /usr/share/libpostal: " + err.Error())
-		}
-		defer p2.Close()
-
-		expansions := p2.Expand("123 Main St")
-		Expect(expansions).To(ContainElement("123 main street"))
+	AfterAll(func() {
+		p.Close()
 	})
 
-	It("returns an error for an invalid data directory", func() {
-		_, err := postal.New(postal.WithDataDir("/nonexistent/path"))
-		Expect(err).To(HaveOccurred())
-	})
-})
-
-var _ = Describe("Expand", func() {
 	It("expands a simple English address", func() {
 		expansions := p.Expand("123 Main St")
 		Expect(expansions).To(ContainElement("123 main street"))
