@@ -4,7 +4,6 @@ package postal
 #cgo pkg-config: libpostal
 #include <libpostal/libpostal.h>
 #include <stdlib.h>
-
 */
 import "C"
 
@@ -16,52 +15,76 @@ import (
 	"unsafe"
 )
 
-var mu sync.Mutex
-
-// Setup initializes libpostal and the language classifier with the default data directory.
-func Setup() error {
-	return SetupDataDir("")
+// Postal provides address parsing and normalization via libpostal.
+type Postal struct {
+	mu sync.Mutex
 }
 
-// SetupDataDir initializes libpostal and the language classifier with a custom data directory.
-// If dataDir is empty, it checks the LIBPOSTAL_DATA_DIR environment variable.
-// If neither is set, libpostal's compiled-in default is used.
-func SetupDataDir(dataDir string) error {
+// Option configures a Postal instance.
+type Option func(*config)
+
+type config struct {
+	dataDir string
+}
+
+// WithDataDir sets a custom libpostal data directory.
+// If not provided, the LIBPOSTAL_DATA_DIR environment variable is checked,
+// then libpostal's compiled-in default is used.
+func WithDataDir(dir string) Option {
+	return func(c *config) {
+		c.dataDir = dir
+	}
+}
+
+// New creates a new Postal instance, initializing libpostal with the given options.
+func New(opts ...Option) (*Postal, error) {
+	cfg := &config{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	dataDir := cfg.dataDir
 	if dataDir == "" {
 		dataDir = os.Getenv("LIBPOSTAL_DATA_DIR")
 	}
-
-	mu.Lock()
-	defer mu.Unlock()
 
 	if dataDir != "" {
 		cDataDir := C.CString(dataDir)
 		defer C.free(unsafe.Pointer(cDataDir))
 		if !bool(C.libpostal_setup_datadir(cDataDir)) {
-			return fmt.Errorf("libpostal setup failed for data directory: %s", dataDir)
+			return nil, fmt.Errorf("libpostal setup failed for data directory: %s", dataDir)
 		}
 		if !bool(C.libpostal_setup_language_classifier_datadir(cDataDir)) {
-			return fmt.Errorf("libpostal language classifier setup failed for data directory: %s", dataDir)
+			return nil, fmt.Errorf("libpostal language classifier setup failed for data directory: %s", dataDir)
+		}
+		if !bool(C.libpostal_setup_parser_datadir(cDataDir)) {
+			return nil, fmt.Errorf("libpostal parser setup failed for data directory: %s", dataDir)
 		}
 	} else {
 		if !bool(C.libpostal_setup()) {
-			return fmt.Errorf("libpostal setup failed: data directory may be missing")
+			return nil, fmt.Errorf("libpostal setup failed: data directory may be missing")
 		}
 		if !bool(C.libpostal_setup_language_classifier()) {
-			return fmt.Errorf("libpostal language classifier setup failed")
+			return nil, fmt.Errorf("libpostal language classifier setup failed")
+		}
+		if !bool(C.libpostal_setup_parser()) {
+			return nil, fmt.Errorf("libpostal parser setup failed")
 		}
 	}
-	return nil
+
+	return &Postal{}, nil
 }
 
-// Teardown frees libpostal resources. Call this when done using the expand package.
-func Teardown() {
-	mu.Lock()
-	defer mu.Unlock()
+// Close frees all libpostal resources.
+func (p *Postal) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	C.libpostal_teardown()
 	C.libpostal_teardown_language_classifier()
+	C.libpostal_teardown_parser()
 }
 
+// Address component constants for use with ExpandOptions.
 const (
 	AddressNone        = C.LIBPOSTAL_ADDRESS_NONE
 	AddressAny         = C.LIBPOSTAL_ADDRESS_ANY
@@ -80,6 +103,7 @@ const (
 	AddressAll         = C.LIBPOSTAL_ADDRESS_ALL
 )
 
+// ExpandOptions controls address expansion behavior.
 type ExpandOptions struct {
 	Languages              []string
 	AddressComponents      uint16
@@ -104,7 +128,8 @@ type ExpandOptions struct {
 
 var cDefaultOptions = C.libpostal_get_default_options()
 
-func GetDefaultExpansionOptions() ExpandOptions {
+// DefaultExpandOptions returns the default expansion options from libpostal.
+func DefaultExpandOptions() ExpandOptions {
 	return ExpandOptions{
 		Languages:              nil,
 		AddressComponents:      uint16(cDefaultOptions.address_components),
@@ -128,25 +153,31 @@ func GetDefaultExpansionOptions() ExpandOptions {
 	}
 }
 
-var libpostalDefaultOptions = GetDefaultExpansionOptions()
+var defaultExpandOptions = DefaultExpandOptions()
 
-func ExpandAddressOptions(address string, options ExpandOptions) []string {
+// Expand normalizes an address string into expanded forms using default options.
+func (p *Postal) Expand(address string) []string {
+	return p.ExpandWithOptions(address, defaultExpandOptions)
+}
+
+// ExpandWithOptions normalizes an address string using the given options.
+func (p *Postal) ExpandWithOptions(address string, options ExpandOptions) []string {
 	if !utf8.ValidString(address) {
 		return nil
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	cAddress := C.CString(address)
 	defer C.free(unsafe.Pointer(cAddress))
 
-	var char_ptr *C.char
-	ptr_size := unsafe.Sizeof(char_ptr)
+	var charPtr *C.char
+	ptrSize := unsafe.Sizeof(charPtr)
 
 	cOptions := C.libpostal_get_default_options()
 	if options.Languages != nil {
-		cLanguages := C.calloc(C.size_t(len(options.Languages)), C.size_t(ptr_size))
+		cLanguages := C.calloc(C.size_t(len(options.Languages)), C.size_t(ptrSize))
 		cLanguagesPtr := (*[1 << 30](*C.char))(unsafe.Pointer(cLanguages))
 
 		defer C.free(unsafe.Pointer(cLanguages))
@@ -188,9 +219,8 @@ func ExpandAddressOptions(address string, options ExpandOptions) []string {
 
 	numExpansions := uint64(cNumExpansions)
 
-	var expansions = make([]string, numExpansions)
+	expansions := make([]string, numExpansions)
 
-	// Accessing a C array
 	cExpansionsPtr := (*[1 << 30](*C.char))(unsafe.Pointer(cExpansions))
 
 	var i uint64
@@ -200,8 +230,4 @@ func ExpandAddressOptions(address string, options ExpandOptions) []string {
 
 	C.libpostal_expansion_array_destroy(cExpansions, cNumExpansions)
 	return expansions
-}
-
-func ExpandAddress(address string) []string {
-	return ExpandAddressOptions(address, libpostalDefaultOptions)
 }

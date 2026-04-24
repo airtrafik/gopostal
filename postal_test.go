@@ -1,0 +1,93 @@
+package postal_test
+
+import (
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/airtrafik/postal"
+)
+
+var p *postal.Postal
+
+var _ = BeforeSuite(func() {
+	var err error
+	p, err = postal.New()
+	Expect(err).NotTo(HaveOccurred())
+})
+
+var _ = AfterSuite(func() {
+	if p != nil {
+		p.Close()
+	}
+})
+
+func TestPostal(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Postal Suite")
+}
+
+var _ = Describe("New", func() {
+	It("initializes with WithDataDir", func() {
+		// Use the default system data dir path
+		p2, err := postal.New(postal.WithDataDir("/usr/share/libpostal"))
+		if err != nil {
+			Skip("libpostal data not at /usr/share/libpostal: " + err.Error())
+		}
+		defer p2.Close()
+
+		expansions := p2.Expand("123 Main St")
+		Expect(expansions).To(ContainElement("123 main street"))
+	})
+
+	It("initializes with LIBPOSTAL_DATA_DIR env var", func() {
+		GinkgoT().Setenv("LIBPOSTAL_DATA_DIR", "/usr/share/libpostal")
+
+		p2, err := postal.New()
+		if err != nil {
+			Skip("libpostal data not at /usr/share/libpostal: " + err.Error())
+		}
+		defer p2.Close()
+
+		expansions := p2.Expand("123 Main St")
+		Expect(expansions).To(ContainElement("123 main street"))
+	})
+
+	It("returns an error for an invalid data directory", func() {
+		_, err := postal.New(postal.WithDataDir("/nonexistent/path"))
+		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("Expand", func() {
+	It("expands a simple English address", func() {
+		expansions := p.Expand("123 Main St")
+		Expect(expansions).To(ContainElement("123 main street"))
+	})
+
+	It("expands with English language options", func() {
+		opts := postal.DefaultExpandOptions()
+		opts.Languages = []string{"en"}
+
+		expansions := p.ExpandWithOptions("30 West Twenty-sixth St Fl No. 7", opts)
+		Expect(expansions).To(ContainElement("30 west 26th street floor number 7"))
+
+		expansions = p.ExpandWithOptions("Thirty W 26th St Fl #7", opts)
+		Expect(expansions).To(ContainElement("30 west 26th street floor number 7"))
+	})
+
+	It("expands with multilingual options", func() {
+		opts := postal.DefaultExpandOptions()
+		opts.Languages = []string{"en", "fr", "de"}
+
+		expansions := p.ExpandWithOptions("st", opts)
+		Expect(expansions).To(ContainElement("sankt"))
+		Expect(expansions).To(ContainElement("saint"))
+	})
+
+	It("expands non-ASCII addresses", func() {
+		expansions := p.Expand("Friedrichstraße 128, Berlin, Germany")
+		Expect(expansions).To(ContainElement("friedrich strasse 128 berlin germany"))
+	})
+})
