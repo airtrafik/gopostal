@@ -1,6 +1,10 @@
 package postal_test
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,12 +18,38 @@ func TestPostal(t *testing.T) {
 	RunSpecs(t, "Postal Suite")
 }
 
+// findDataDir locates the libpostal data directory.
+// Checks LIBPOSTAL_DATA_DIR env var, then common platform paths.
+func findDataDir() string {
+	if dir := os.Getenv("LIBPOSTAL_DATA_DIR"); dir != "" {
+		return dir
+	}
+
+	// macOS: Homebrew
+	if out, err := exec.Command("brew", "--prefix", "libpostal").Output(); err == nil {
+		dir := filepath.Join(strings.TrimSpace(string(out)), "share", "libpostal")
+		if _, err := os.Stat(filepath.Join(dir, "data_version")); err == nil {
+			return dir
+		}
+	}
+
+	// Alpine: apk package
+	if _, err := os.Stat("/usr/share/libpostal/data_version"); err == nil {
+		return "/usr/share/libpostal"
+	}
+
+	return ""
+}
+
 var _ = Describe("Expand", Ordered, func() {
 	var p *postal.Postal
 
 	BeforeAll(func() {
+		dataDir := findDataDir()
+		Expect(dataDir).NotTo(BeEmpty(), "libpostal data directory not found — install libpostal with data files")
+
 		var err error
-		p, err = postal.New()
+		p, err = postal.New(postal.WithDataDir(dataDir))
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -55,5 +85,10 @@ var _ = Describe("Expand", Ordered, func() {
 	It("expands non-ASCII addresses", func() {
 		expansions := p.Expand("Friedrichstraße 128, Berlin, Germany")
 		Expect(expansions).To(ContainElement("friedrich strasse 128 berlin germany"))
+	})
+
+	It("returns nil for invalid UTF-8 input", func() {
+		expansions := p.Expand("\xff\xfe")
+		Expect(expansions).To(BeNil())
 	})
 })
