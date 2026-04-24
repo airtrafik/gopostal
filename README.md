@@ -1,5 +1,8 @@
 # gopostal
 
+[![CI](https://github.com/airtrafik/gopostal/actions/workflows/ci.yaml/badge.svg)](https://github.com/airtrafik/gopostal/actions/workflows/ci.yaml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/airtrafik/gopostal.svg)](https://pkg.go.dev/github.com/airtrafik/gopostal)
+
 Go/cgo interface to [libpostal](https://github.com/openvenues/libpostal), a C library for fast international street address parsing and normalization.
 
 Fork of [openvenues/gopostal](https://github.com/openvenues/gopostal) with the following improvements:
