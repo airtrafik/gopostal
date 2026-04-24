@@ -28,17 +28,24 @@ func findDataDir() string {
 	// macOS: Homebrew
 	if out, err := exec.Command("brew", "--prefix", "libpostal").Output(); err == nil {
 		dir := filepath.Join(strings.TrimSpace(string(out)), "share", "libpostal")
-		if _, err := os.Stat(filepath.Join(dir, "data_version")); err == nil {
+		if hasLibpostalData(dir) {
 			return dir
 		}
 	}
 
 	// Alpine: apk package
-	if _, err := os.Stat("/usr/share/libpostal/data_version"); err == nil {
+	if hasLibpostalData("/usr/share/libpostal") {
 		return "/usr/share/libpostal"
 	}
 
 	return ""
+}
+
+// hasLibpostalData checks if a directory contains libpostal data files.
+func hasLibpostalData(dir string) bool {
+	// Check for transliteration.dat — present in both Homebrew and Alpine packages.
+	_, err := os.Stat(filepath.Join(dir, "transliteration", "transliteration.dat"))
+	return err == nil
 }
 
 var _ = Describe("New", func() {
