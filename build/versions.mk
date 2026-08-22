@@ -10,7 +10,7 @@
 # Linting tools
 MISSPELL_VERSION      := v0.3.4
 GOIMPORTS_VERSION     := v0.36.0
-GOLANGCI_VERSION      := v2.3.1
+GOLANGCI_VERSION      := v2.13.1
 
 # Testing tools
 GOTESTSUM_VERSION     := v1.12.3

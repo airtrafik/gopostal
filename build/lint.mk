@@ -44,6 +44,6 @@ goimports: deps-only
 
 golangci: deps-only
 	@echo "=== $(PROJECT_NAME) === [ golangci-lint    ]: Linting..."
-	@$(GO) run $(GOLANGCI_PKG) run
+	@$(GO) run $(GOLANGCI_PKG) run --allow-serial-runners
 
 .PHONY: lint spell-check spell-check-fix gofmt gofmt-fix lint-fix goimports golangci
