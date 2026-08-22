@@ -46,4 +46,8 @@ golangci: deps-only
 	@echo "=== $(PROJECT_NAME) === [ golangci-lint    ]: Linting..."
 	@$(GO) run $(GOLANGCI_PKG) run --allow-serial-runners
 
-.PHONY: lint spell-check spell-check-fix gofmt gofmt-fix lint-fix goimports golangci
+outdated: deps-only
+	@echo "=== $(PROJECT_NAME) === [ outdated         ]: Finding outdated deps..."
+	@$(GO) list -u -m -json -mod=mod all | $(GO) run $(GO_MOD_OUTDATED_PKG) -direct -update
+
+.PHONY: lint spell-check spell-check-fix gofmt gofmt-fix lint-fix goimports golangci outdated
