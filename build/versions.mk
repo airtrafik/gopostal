@@ -9,11 +9,11 @@
 
 # Linting tools
 MISSPELL_VERSION      := v0.3.4
-GOIMPORTS_VERSION     := v0.36.0
+GOIMPORTS_VERSION     := v0.49.0
 GOLANGCI_VERSION      := v2.13.1
 
 # Testing tools
-GOTESTSUM_VERSION     := v1.12.3
+GOTESTSUM_VERSION     := v1.13.0
 
 # Release tools
 SVU_VERSION           := v1.12.0
